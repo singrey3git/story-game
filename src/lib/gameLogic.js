@@ -4,6 +4,8 @@ export const PLOTS = [
   {
     id: 'overcoming-the-monster',
     name: 'Overcoming the Monster',
+    description:
+      'One of the oldest plot types, rooted in the human experience of confronting a dangerous "other" — a beast, an enemy, or an outsider. At its core is the opposition between "us" and "them": the threat is endowed with power and aggression, and the hero must confront it and restore a safe order.',
     stages: [
       'Disruption of Order',
       'Emergence of a Threat',
@@ -16,6 +18,8 @@ export const PLOTS = [
   {
     id: 'rags-to-riches',
     name: 'Rags to Riches',
+    description:
+      'This plot emerges from an awareness of social inequality and hierarchy. A hero who begins in a disadvantaged or low-status position is given an opportunity to change their fate and move into a higher, freer, or more privileged social position.',
     stages: [
       'Initial Hardship',
       'Good Fortune',
@@ -28,6 +32,8 @@ export const PLOTS = [
   {
     id: 'quest',
     name: 'Quest',
+    description:
+      'The Quest can be seen as a modern development of the Voyage and Return plot, in which the focus shifts from returning home to the task or obstacle itself. The hero moves through a sequence of interconnected challenges, gathers knowledge, solves puzzles, and advances toward a specific goal; the detective story is a characteristic example of this logic.',
     stages: [
       'Task',
       'Movement Toward the Goal',
@@ -39,6 +45,8 @@ export const PLOTS = [
   {
     id: 'voyage-and-return',
     name: 'Voyage and Return',
+    description:
+      'One of the fundamental plots of early cultures, reflecting rites of initiation for younger members of the community. Necessity forces the hero to leave the familiar world, undergo a series of trials, and eventually return transformed. Returning is as important as leaving: the hero comes back to the point of origin as a different person, having acquired new experience, status, or understanding of the world.',
     stages: [
       'Departure from the Familiar World',
       'Other World / Distant Land',
@@ -51,6 +59,8 @@ export const PLOTS = [
   {
     id: 'comedy',
     name: 'Comedy',
+    description:
+      'This plot is built around an escalating entanglement of relationships: misunderstandings, coincidences, hidden motives, and accidental actions increasingly confuse the characters and their relations with one another. The absurdity reaches a breaking point, followed by a release: secrets are revealed, misunderstandings are cleared up, and the disrupted order of relationships is restored.',
     stages: [
       'Initial Relationships',
       'Entanglement',
@@ -63,6 +73,8 @@ export const PLOTS = [
   {
     id: 'tragedy',
     name: 'Tragedy',
+    description:
+      'Tragedy reflects on fate, mortality, and the limits of human control over one\u2019s own destiny. The hero acts, hopes, and struggles, yet moves toward an unavoidable collapse: fate, circumstances, or their own mistakes ultimately lead to loss, catastrophe, or death.',
     stages: [
       'Doom from the Outset',
       'Hope / Temporary Success',
@@ -75,6 +87,8 @@ export const PLOTS = [
   {
     id: 'rebirth',
     name: 'Rebirth',
+    description:
+      'A later, more psychological variation of the Voyage and Return plot, in which the central journey is internal rather than external. The hero begins in an unsatisfactory or destructive state, but an encounter, love, a trial, or another significant experience initiates a transformation and leads them toward a new way of being.',
     stages: [
       'Wretched State',
       'Catalytic Event / Encounter',
@@ -87,6 +101,8 @@ export const PLOTS = [
   {
     id: 'self-sacrifice',
     name: 'Self-Sacrifice',
+    description:
+      'This plot explores love through the willingness to give up one\u2019s own well-being for another person. The hero consciously accepts loss, suffering, the surrender of privilege, or even death, placing the value of another person above personal gain; this narrative pattern was developed particularly strongly within the Christian cultural tradition.',
     stages: [
       'Love / Attachment',
       "Another Person's Distress",
@@ -99,6 +115,8 @@ export const PLOTS = [
   {
     id: 'rebellion',
     name: 'Rebellion',
+    description:
+      'At the centre of this plot are free will and the individual\u2019s right to reject an imposed order. The order is flawed from the outset. The hero consciously defies society, authority, fate, or even the structure of the world itself and may ultimately fail, but the meaning of the story lies in their fidelity to their own choice and principle.',
     stages: [
       'Unjust Order',
       'Refusal to Accept It',

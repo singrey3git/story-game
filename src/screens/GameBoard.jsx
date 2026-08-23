@@ -1,5 +1,6 @@
 import Card from '../components/Card'
 import StageThread from '../components/StageThread'
+import StageTimer from '../components/StageTimer'
 import TurnResult from '../components/TurnResult'
 import TurnSequenceBar from '../components/TurnSequenceBar'
 import { getPlot, getStages, speakerNumberForTurn } from '../lib/gameLogic'
@@ -68,10 +69,13 @@ export default function GameBoard({
         <p className="board-status__stage">
           {plot?.name} — Stage {stageNumber} of {totalTurns}
         </p>
-        <p className="board-status__count">
-          {availableCards.length} card{availableCards.length === 1 ? '' : 's'} remaining
-          {stageNumber === totalTurns ? ' · final stage' : ''}
-        </p>
+        <div className="board-status__right">
+          {phase !== 'reviewing' && <StageTimer startedAt={room.turn_started_at} />}
+          <p className="board-status__count">
+            {availableCards.length} card{availableCards.length === 1 ? '' : 's'} remaining
+            {stageNumber === totalTurns ? ' · final stage' : ''}
+          </p>
+        </div>
       </div>
 
       {!partnerOnline && (

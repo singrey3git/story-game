@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { PLOTS, getStages } from '../lib/gameLogic'
+import { getPlotExamples } from '../lib/plotExamples'
 import StageThread from './StageThread'
 
 const SECTOR_ANGLE = 360 / PLOTS.length
@@ -33,40 +34,69 @@ const LABEL_INNER_R = HUB_R + 8
 const LABEL_OUTER_R = OUTER_R - 8
 const LABEL_MID_R = (LABEL_INNER_R + LABEL_OUTER_R) / 2
 
-export default function PlotWheel({ plotId, onSpin, spinDisabled, onContinue }) {
+export default function PlotWheel({
+  plotId,
+  cards,
+  onSpin,
+  onRespin,
+  spinDisabled,
+  onContinue,
+  unfamiliarIds,
+  onToggleUnfamiliar,
+}) {
   const [rotation, setRotation] = useState(0)
   const [animating, setAnimating] = useState(false)
   const hasAnimatedRef = useRef(false)
   const knewOnMountRef = useRef(plotId)
+  const prevPlotIdRef = useRef(plotId)
 
   const selectedIndex = plotId ? PLOTS.findIndex((p) => p.id === plotId) : -1
+
+  // If the plot gets cleared (someone hit "spin again"), arm the animation
+  // to play again for the next landing.
+  useEffect(() => {
+    if (prevPlotIdRef.current && !plotId) {
+      hasAnimatedRef.current = false
+      knewOnMountRef.current = null
+      setRotation((r) => r % 360)
+      setAnimating(false)
+    }
+    prevPlotIdRef.current = plotId
+  }, [plotId])
 
   useEffect(() => {
     if (selectedIndex === -1 || hasAnimatedRef.current) return
     hasAnimatedRef.current = true
 
-    // Rotate so the middle of the selected sector ends up under the fixed
-    // top pointer (0deg = up, sectors are laid out clockwise from there).
-    const finalAngle = SPIN_TURNS * 360 - (selectedIndex * SECTOR_ANGLE + SECTOR_ANGLE / 2)
+    const mid = selectedIndex * SECTOR_ANGLE + SECTOR_ANGLE / 2
 
     if (knewOnMountRef.current) {
       // Someone else already spun before we joined — jump straight to the result.
-      setRotation(((finalAngle % 360) + 360) % 360)
+      const resting = SPIN_TURNS * 360 - mid
+      setRotation(((resting % 360) + 360) % 360)
       return
     }
 
+    // Spin forward from wherever the wheel currently sits (handles both the
+    // very first spin and any later re-spins) and land with `mid` at the top.
+    const targetMod = ((-mid % 360) + 360) % 360
+    const extra = ((targetMod - (rotation % 360)) % 360 + 360) % 360
+    const target = rotation + SPIN_TURNS * 360 + extra
+
     setAnimating(true)
-    requestAnimationFrame(() => requestAnimationFrame(() => setRotation(finalAngle)))
+    requestAnimationFrame(() => requestAnimationFrame(() => setRotation(target)))
     const timer = setTimeout(() => setAnimating(false), SPIN_MS)
     return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIndex])
 
   const landed = plotId && !animating
   const selectedPlot = selectedIndex >= 0 ? PLOTS[selectedIndex] : null
   const stages = landed ? getStages(plotId) : []
+  const examples = landed ? getPlotExamples(plotId) : []
 
   return (
-    <div className="screen screen--centered">
+    <div className="screen screen--wide">
       <div className="hero hero--compact">
         <p className="eyebrow">Before you begin</p>
         <h1 className="hero__title hero__title--small">
@@ -79,83 +109,129 @@ export default function PlotWheel({ plotId, onSpin, spinDisabled, onContinue }) 
         </p>
       </div>
 
-      <div className="wheel">
-        <div className="wheel__pointer" aria-hidden="true" />
-        <svg
-          className="wheel__svg"
-          viewBox="0 0 300 300"
-          style={{
-            transform: `rotate(${rotation}deg)`,
-            transition: animating ? `transform ${SPIN_MS}ms cubic-bezier(0.1, 0.86, 0.15, 1)` : 'none',
-          }}
-        >
-          {PLOTS.map((plot, i) => {
-            const start = i * SECTOR_ANGLE
-            const end = start + SECTOR_ANGLE
-            const mid = start + SECTOR_ANGLE / 2
-            const p1 = pointOnCircle(CX, CY, OUTER_R, start)
-            const p2 = pointOnCircle(CX, CY, OUTER_R, end)
+      <div className="plot-layout">
+        <div className="plot-layout__wheel">
+          <div className="wheel">
+            <div className="wheel__pointer" aria-hidden="true" />
+            <svg
+              className="wheel__svg"
+              viewBox="0 0 300 300"
+              style={{
+                transform: `rotate(${rotation}deg)`,
+                transition: animating ? `transform ${SPIN_MS}ms cubic-bezier(0.1, 0.86, 0.15, 1)` : 'none',
+              }}
+            >
+              {PLOTS.map((plot, i) => {
+                const start = i * SECTOR_ANGLE
+                const end = start + SECTOR_ANGLE
+                const mid = start + SECTOR_ANGLE / 2
+                const p1 = pointOnCircle(CX, CY, OUTER_R, start)
+                const p2 = pointOnCircle(CX, CY, OUTER_R, end)
 
-            // Labels run radially (like a classic prize wheel), centered
-            // within the band from hub to rim so every label sits in the
-            // same relative spot — not pinned to one edge, which is what
-            // made them look scattered and crowded near the hub.
-            // Whether a label needs flipping depends on where it actually
-            // ends up on screen *after* the wheel's current rotation — not
-            // its original resting angle — so the winner always lands
-            // right-side-up under the pointer.
-            const displayAngle = ((mid + rotation) % 360 + 360) % 360
-            const flip = displayAngle > 90 && displayAngle < 270
-            const rotateDeg = flip ? mid + 90 : mid - 90
-            const labelPos = pointOnCircle(CX, CY, LABEL_MID_R, mid)
-            const availableLength = LABEL_OUTER_R - LABEL_INNER_R - 4
-            const fontSize = Math.max(6, Math.min(9.5, availableLength / (plot.name.length * 0.56)))
+                const displayAngle = ((mid + rotation) % 360 + 360) % 360
+                const flip = displayAngle > 90 && displayAngle < 270
+                const rotateDeg = flip ? mid + 90 : mid - 90
+                const labelPos = pointOnCircle(CX, CY, LABEL_MID_R, mid)
+                const availableLength = LABEL_OUTER_R - LABEL_INNER_R - 4
+                const fontSize = Math.max(6, Math.min(9.5, availableLength / (plot.name.length * 0.56)))
 
-            return (
-              <g key={plot.id}>
-                <path
-                  d={`M ${CX},${CY} L ${p1.x},${p1.y} A ${OUTER_R},${OUTER_R} 0 0,1 ${p2.x},${p2.y} Z`}
-                  fill={SECTOR_COLORS[i % SECTOR_COLORS.length]}
-                  stroke="#1e2433"
-                  strokeWidth="2"
-                />
-                <text
-                  x={labelPos.x}
-                  y={labelPos.y}
-                  transform={`rotate(${rotateDeg}, ${labelPos.x}, ${labelPos.y})`}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={fontSize}
-                  className="wheel__label"
-                >
-                  {plot.name}
-                </text>
-              </g>
-            )
-          })}
-          <circle cx={CX} cy={CY} r={HUB_R} className="wheel__hub" />
-        </svg>
+                return (
+                  <g key={plot.id}>
+                    <path
+                      d={`M ${CX},${CY} L ${p1.x},${p1.y} A ${OUTER_R},${OUTER_R} 0 0,1 ${p2.x},${p2.y} Z`}
+                      fill={SECTOR_COLORS[i % SECTOR_COLORS.length]}
+                      stroke="#1e2433"
+                      strokeWidth="2"
+                    />
+                    <text
+                      x={labelPos.x}
+                      y={labelPos.y}
+                      transform={`rotate(${rotateDeg}, ${labelPos.x}, ${labelPos.y})`}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontSize={fontSize}
+                      className="wheel__label"
+                    >
+                      {plot.name}
+                    </text>
+                  </g>
+                )
+              })}
+              <circle cx={CX} cy={CY} r={HUB_R} className="wheel__hub" />
+            </svg>
 
-        {!plotId && (
-          <button
-            type="button"
-            className="wheel__spin-btn"
-            disabled={spinDisabled || animating}
-            onClick={onSpin}
-          >
-            Spin
-          </button>
-        )}
+            {!plotId && (
+              <button
+                type="button"
+                className="wheel__spin-btn"
+                disabled={spinDisabled || animating}
+                onClick={onSpin}
+              >
+                Spin
+              </button>
+            )}
+          </div>
+
+          {landed && (
+            <div className="plot-layout__actions">
+              <button type="button" className="btn btn--primary btn--large" onClick={onContinue}>
+                Begin the story
+              </button>
+              <button type="button" className="btn-link" onClick={onRespin}>
+                Spin again for a different shape
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="plot-layout__side">
+          {landed && (
+            <div className="panel plot-info">
+              <p className="eyebrow">About this shape</p>
+              <p className="plot-info__description">{selectedPlot.description}</p>
+
+              {examples.length > 0 && (
+                <>
+                  <p className="plot-info__examples-label">Familiar stories that follow it</p>
+                  <div className="plot-info__examples">
+                    {examples.map((src, i) => (
+                      <img key={i} src={src} alt="" className="plot-info__poster" loading="lazy" />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <StageThread stages={stages} currentStage={1} />
+            </div>
+          )}
+
+          {cards.length > 0 && (
+            <div className="panel vocab-preview">
+              <p className="eyebrow">Your vocabulary — {cards.length} cards</p>
+              <p className="muted">
+                Take a look now, and tap anything you don't know yet — we'll check back at the end to see
+                how many made it into the story.
+              </p>
+              <div className="chip-grid">
+                {cards.map((card) => {
+                  const marked = unfamiliarIds?.has(card.id)
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      className={`chip chip--toggle${marked ? ' chip--unfamiliar' : ''}`}
+                      onClick={() => onToggleUnfamiliar?.(card)}
+                    >
+                      {card.text}
+                      {marked && <span className="chip__badge">new to me</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-
-      {landed && (
-        <>
-          <StageThread stages={stages} currentStage={1} />
-          <button type="button" className="btn btn--primary btn--large" onClick={onContinue}>
-            Begin the story
-          </button>
-        </>
-      )}
     </div>
   )
 }

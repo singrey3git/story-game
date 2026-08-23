@@ -31,7 +31,26 @@ database is missing one column added later (`rooms.plot_id`, used by the
 alter table rooms add column if not exists plot_id text;
 ```
 
-(Also saved as [`supabase/migration_add_plot_id.sql`](./supabase/migration_add_plot_id.sql).)
+Also, if you already applied that first migration and are now pulling in the "mark unfamiliar words" feature, run this one too:
+
+```sql
+alter table turn_selections drop constraint if exists turn_selections_selection_type_check;
+alter table turn_selections
+  add constraint turn_selections_selection_type_check
+  check (selection_type in ('speaker_claim', 'listener_heard', 'marked_unfamiliar'));
+```
+
+(Also saved as [`supabase/migration_add_plot_id.sql`](./supabase/migration_add_plot_id.sql) and
+[`supabase/migration_add_unfamiliar_marks.sql`](./supabase/migration_add_unfamiliar_marks.sql).)
+
+And if you're pulling in the per-stage timer feature, run this one too:
+
+```sql
+alter table rooms add column if not exists turn_started_at timestamptz;
+alter table rooms add column if not exists stage_durations jsonb not null default '{}'::jsonb;
+```
+
+(Also saved as [`supabase/migration_add_stage_timing.sql`](./supabase/migration_add_stage_timing.sql).)
 
 ## 1. Set up Supabase
 

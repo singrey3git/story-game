@@ -341,6 +341,64 @@ export default function App() {
     }
   }, [room])
 
+  const handleRespinPlot = useCallback(async () => {
+    if (!room) return
+    try {
+      const { data } = await supabase
+        .from('rooms')
+        .update({ plot_id: null })
+        .eq('id', room.id)
+        .select()
+        .single()
+      if (data) setRoom(data)
+    } catch (err) {
+      console.error(err)
+    }
+  }, [room])
+
+  const myUnfamiliarIds = useMemo(
+    () =>
+      new Set(
+        selections
+          .filter(
+            (s) => s.turn_number === 0 && s.selection_type === 'marked_unfamiliar' && s.player_id === myPlayer?.id
+          )
+          .map((s) => s.card_id)
+      ),
+    [selections, myPlayer]
+  )
+
+  const handleToggleUnfamiliar = useCallback(
+    async (card) => {
+      if (!room || !myPlayer) return
+      const existing = selections.find(
+        (s) =>
+          s.turn_number === 0 &&
+          s.selection_type === 'marked_unfamiliar' &&
+          s.player_id === myPlayer.id &&
+          s.card_id === card.id
+      )
+      if (existing) {
+        await supabase.from('turn_selections').delete().eq('id', existing.id)
+        setSelections((prev) => prev.filter((s) => s.id !== existing.id))
+      } else {
+        const { data } = await supabase
+          .from('turn_selections')
+          .insert({
+            room_id: room.id,
+            turn_number: 0,
+            player_id: myPlayer.id,
+            card_id: card.id,
+            selection_type: 'marked_unfamiliar',
+          })
+          .select()
+          .single()
+        if (data) setSelections((prev) => [...prev, data])
+      }
+    },
+    [room, myPlayer, selections]
+  )
+
   const currentTurnSelections = useMemo(
     () => selections.filter((s) => s.turn_number === room?.current_turn),
     [selections, room?.current_turn]
@@ -441,10 +499,15 @@ export default function App() {
   const handleContinue = useCallback(async () => {
     if (!room) return
     const totalTurns = getStages(room.plot_id).length
+    const elapsedSeconds = room.turn_started_at
+      ? Math.max(0, Math.round((Date.now() - new Date(room.turn_started_at).getTime()) / 1000))
+      : 0
+    const stageDurations = { ...(room.stage_durations || {}), [room.current_turn]: elapsedSeconds }
+
     if (room.current_turn >= totalTurns) {
       const { data } = await supabase
         .from('rooms')
-        .update({ status: 'finished', turn_phase: 'finished' })
+        .update({ status: 'finished', turn_phase: 'finished', stage_durations: stageDurations })
         .eq('id', room.id)
         .select()
         .single()
@@ -452,11 +515,34 @@ export default function App() {
     } else {
       const { data } = await supabase
         .from('rooms')
-        .update({ current_turn: room.current_turn + 1, turn_phase: 'active', last_turn_result: null })
+        .update({
+          current_turn: room.current_turn + 1,
+          turn_phase: 'active',
+          last_turn_result: null,
+          stage_durations: stageDurations,
+          turn_started_at: new Date().toISOString(),
+        })
         .eq('id', room.id)
         .select()
         .single()
       if (data) setRoom(data)
+    }
+  }, [room])
+
+  const handleBeginStory = useCallback(async () => {
+    setPlotRevealed(true)
+    if (!room || room.turn_started_at) return
+    try {
+      const { data } = await supabase
+        .from('rooms')
+        .update({ turn_started_at: new Date().toISOString() })
+        .eq('id', room.id)
+        .is('turn_started_at', null)
+        .select()
+        .maybeSingle()
+      if (data) setRoom(data)
+    } catch (err) {
+      console.error(err)
     }
   }, [room])
 
@@ -488,6 +574,49 @@ export default function App() {
     setSelections([])
     navigateToRoom('')
   }, [room, navigateToRoom])
+
+  const handlePracticeAgain = useCallback(async () => {
+    if (!room) return
+    setBusy(true)
+    try {
+      const cardIds = cards.map((c) => c.id)
+      if (cardIds.length > 0) {
+        await supabase
+          .from('cards')
+          .update({ status: 'available', validated_stage: null, validated_turn: null })
+          .in('id', cardIds)
+      }
+      // Clear this room's turn history (gameplay selections and the
+      // pre-game "new to me" marks) so the next round starts fresh.
+      await supabase.from('turn_selections').delete().eq('room_id', room.id)
+
+      const firstSpeaker = Math.random() < 0.5 ? 1 : 2
+      const { data } = await supabase
+        .from('rooms')
+        .update({
+          status: 'playing',
+          plot_id: null,
+          current_turn: 1,
+          turn_phase: 'active',
+          first_speaker: firstSpeaker,
+          last_turn_result: null,
+          turn_started_at: null,
+          stage_durations: {},
+        })
+        .eq('id', room.id)
+        .select()
+        .single()
+
+      if (data) setRoom(data)
+      setCards((prev) => prev.map((c) => ({ ...c, status: 'available', validated_stage: null, validated_turn: null })))
+      setSelections([])
+    } catch (err) {
+      console.error(err)
+      setErrorMessage('Could not start a new round. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }, [room, cards])
 
   // --- Resume a saved session on refresh ---------------------------------------
   useEffect(() => {
@@ -584,9 +713,13 @@ export default function App() {
     return (
       <PlotWheel
         plotId={room.plot_id}
+        cards={cards}
         onSpin={handleSpinPlot}
+        onRespin={handleRespinPlot}
         spinDisabled={busy}
-        onContinue={() => setPlotRevealed(true)}
+        onContinue={handleBeginStory}
+        unfamiliarIds={myUnfamiliarIds}
+        onToggleUnfamiliar={handleToggleUnfamiliar}
       />
     )
   }
@@ -608,5 +741,16 @@ export default function App() {
     )
   }
 
-  return <Results cards={cards} plotId={room.plot_id} onPlayAgain={handlePlayAgain} />
+  return (
+    <Results
+      cards={cards}
+      plotId={room.plot_id}
+      players={players}
+      selections={selections}
+      stageDurations={room.stage_durations}
+      onPlayAgain={handlePlayAgain}
+      onPracticeAgain={handlePracticeAgain}
+      busy={busy}
+    />
+  )
 }

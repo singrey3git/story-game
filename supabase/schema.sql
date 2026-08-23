@@ -23,6 +23,8 @@ create table if not exists rooms (
   current_turn      int not null default 1,
   turn_phase        text not null default 'active'
                        check (turn_phase in ('active', 'awaiting_confirm', 'reviewing', 'finished')),
+  turn_started_at   timestamptz,
+  stage_durations   jsonb not null default '{}'::jsonb,
   last_turn_result  jsonb,
   created_at        timestamptz not null default now()
 );
@@ -56,7 +58,7 @@ create table if not exists turn_selections (
   turn_number     int not null,
   player_id       uuid not null references players(id) on delete cascade,
   card_id         uuid not null references cards(id) on delete cascade,
-  selection_type  text not null check (selection_type in ('speaker_claim', 'listener_heard')),
+  selection_type  text not null check (selection_type in ('speaker_claim', 'listener_heard', 'marked_unfamiliar')),
   created_at      timestamptz not null default now(),
   unique (room_id, turn_number, player_id, card_id, selection_type)
 );
