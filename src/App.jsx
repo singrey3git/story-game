@@ -180,6 +180,29 @@ export default function App() {
     }
   }, [room?.id])
 
+  // Realtime is best-effort — a brief disconnect (tab backgrounded, network
+  // hiccup, laptop sleep) can silently miss an event. That's low-stakes for
+  // most of the game, but the final results need to be exactly right, so we
+  // do one authoritative refetch the moment the game finishes, for whoever's
+  // client triggered it and whoever receives that status change live.
+  useEffect(() => {
+    if (!room || room.status !== 'finished') return
+    let cancelled = false
+    async function refetchFinal() {
+      const [{ data: freshCards }, { data: freshSelections }] = await Promise.all([
+        supabase.from('cards').select('*').eq('room_id', room.id).order('order_index'),
+        supabase.from('turn_selections').select('*').eq('room_id', room.id),
+      ])
+      if (cancelled) return
+      if (freshCards) setCards(freshCards)
+      if (freshSelections) setSelections(freshSelections)
+    }
+    refetchFinal()
+    return () => {
+      cancelled = true
+    }
+  }, [room?.status, room?.id])
+
   const myPlayer = useMemo(
     () => players.find((p) => p.user_id === userId) || null,
     [players, userId]
