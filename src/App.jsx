@@ -166,7 +166,20 @@ export default function App() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'cards', filter: `room_id=eq.${room.id}` },
-        (payload) => setCards((prev) => applyChange(payload, prev))
+        () => {
+          // Card list edits happen as a destructive delete+reinsert batch —
+          // patching event-by-event is exactly what let a missed event leave
+          // stale duplicates behind. A fresh authoritative fetch on any
+          // change is cheap here (edits are infrequent) and self-healing.
+          supabase
+            .from('cards')
+            .select('*')
+            .eq('room_id', room.id)
+            .order('order_index')
+            .then(({ data }) => {
+              if (data) setCards(data)
+            })
+        }
       )
       .on(
         'postgres_changes',
@@ -286,24 +299,41 @@ export default function App() {
     [room, userId]
   )
 
+  const cardsRef = useRef(cards)
+  useEffect(() => {
+    cardsRef.current = cards
+  }, [cards])
+
+  const wordsChangeTimeoutRef = useRef(null)
+  useEffect(() => {
+    return () => {
+      if (wordsChangeTimeoutRef.current) clearTimeout(wordsChangeTimeoutRef.current)
+    }
+  }, [])
+
   const handleWordsChange = useCallback(
-    async (raw) => {
-      if (!room || room.status !== 'lobby') return
-      const words = parseWordList(raw)
-      // Full replace is simple and safe pre-game: delete existing cards, insert the new set.
-      const existingIds = cards.map((c) => c.id)
-      if (existingIds.length > 0) {
-        await supabase.from('cards').delete().in('id', existingIds)
-      }
-      if (words.length > 0) {
-        const rows = words.map((text, i) => ({ room_id: room.id, text, order_index: i }))
-        const { data } = await supabase.from('cards').insert(rows).select()
-        setCards(data || [])
-      } else {
-        setCards([])
-      }
+    (raw) => {
+      if (wordsChangeTimeoutRef.current) clearTimeout(wordsChangeTimeoutRef.current)
+      // Debounce so a full delete+reinsert doesn't fire on every keystroke —
+      // that flood of realtime events was how the partner's list ended up
+      // with duplicated cards if even one event went missing along the way.
+      wordsChangeTimeoutRef.current = setTimeout(async () => {
+        if (!room || room.status !== 'lobby') return
+        const words = parseWordList(raw)
+        const existingIds = cardsRef.current.map((c) => c.id)
+        if (existingIds.length > 0) {
+          await supabase.from('cards').delete().in('id', existingIds)
+        }
+        if (words.length > 0) {
+          const rows = words.map((text, i) => ({ room_id: room.id, text, order_index: i }))
+          const { data } = await supabase.from('cards').insert(rows).select()
+          setCards(data || [])
+        } else {
+          setCards([])
+        }
+      }, 500)
     },
-    [room, cards]
+    [room]
   )
 
   const handleRemoveCard = useCallback(
