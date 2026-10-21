@@ -486,8 +486,69 @@ export default function App() {
     [room, myPlayer, currentTurnSelections]
   )
 
+  // --- Live speech transcription ----------------------------------------------
+  // Only the current speaker's browser runs speech recognition; we debounce
+  // writes to the room row so the listener sees the text a moment later
+  // (via the realtime room subscription) without flooding the database on
+  // every partial recognition result.
+  const transcriptTimeoutRef = useRef(null)
+  const latestTranscriptRef = useRef('')
+  const roomRef = useRef(room)
+  useEffect(() => {
+    roomRef.current = room
+  }, [room])
+
+  useEffect(() => {
+    return () => {
+      if (transcriptTimeoutRef.current) clearTimeout(transcriptTimeoutRef.current)
+    }
+  }, [])
+
+  // Starting a fresh stage should not carry over the previous stage's
+  // pending transcript text into a late debounced write.
+  useEffect(() => {
+    latestTranscriptRef.current = ''
+    if (transcriptTimeoutRef.current) {
+      clearTimeout(transcriptTimeoutRef.current)
+      transcriptTimeoutRef.current = null
+    }
+  }, [room?.id, room?.current_turn])
+
+  const flushTranscript = useCallback(async (text) => {
+    const current = roomRef.current
+    if (!current) return
+    const turnTranscripts = { ...(current.turn_transcripts || {}), [current.current_turn]: text }
+    const { data } = await supabase
+      .from('rooms')
+      .update({ turn_transcripts: turnTranscripts })
+      .eq('id', current.id)
+      .select()
+      .single()
+    if (data) setRoom(data)
+  }, [])
+
+  const handleTranscriptUpdate = useCallback(
+    (text) => {
+      latestTranscriptRef.current = text
+      if (transcriptTimeoutRef.current) clearTimeout(transcriptTimeoutRef.current)
+      transcriptTimeoutRef.current = setTimeout(() => {
+        flushTranscript(latestTranscriptRef.current)
+      }, 1200)
+    },
+    [flushTranscript]
+  )
+
   const handleEndTurn = useCallback(async () => {
     if (!room) return
+    // Flush whatever was said right up to the end of the turn before the
+    // debounce timer would otherwise have fired.
+    if (transcriptTimeoutRef.current) {
+      clearTimeout(transcriptTimeoutRef.current)
+      transcriptTimeoutRef.current = null
+    }
+    if (latestTranscriptRef.current) {
+      await flushTranscript(latestTranscriptRef.current)
+    }
     const { data } = await supabase
       .from('rooms')
       .update({ turn_phase: 'awaiting_confirm' })
@@ -495,7 +556,7 @@ export default function App() {
       .select()
       .single()
     if (data) setRoom(data)
-  }, [room])
+  }, [room, flushTranscript])
 
   const handleConfirmHeard = useCallback(async () => {
     if (!room) return
@@ -655,6 +716,7 @@ export default function App() {
           last_turn_result: null,
           turn_started_at: null,
           stage_durations: {},
+          turn_transcripts: {},
         })
         .eq('id', room.id)
         .select()
@@ -790,6 +852,7 @@ export default function App() {
         onEndTurn={handleEndTurn}
         onConfirmHeard={handleConfirmHeard}
         onContinue={handleContinue}
+        onTranscriptUpdate={handleTranscriptUpdate}
       />
     )
   }
@@ -801,6 +864,8 @@ export default function App() {
       players={players}
       selections={selections}
       stageDurations={room.stage_durations}
+      turnTranscripts={room.turn_transcripts}
+      firstSpeaker={room.first_speaker}
       onPlayAgain={handlePlayAgain}
       onPracticeAgain={handlePracticeAgain}
       busy={busy}

@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react'
 import Card from '../components/Card'
 import StageThread from '../components/StageThread'
 import StageTimer from '../components/StageTimer'
+import TranscriptPanel from '../components/TranscriptPanel'
 import TurnResult from '../components/TurnResult'
 import TurnSequenceBar from '../components/TurnSequenceBar'
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
 import { getPlot, getStages, speakerNumberForTurn } from '../lib/gameLogic'
 
 function tiltFor(id) {
@@ -22,6 +25,7 @@ export default function GameBoard({
   onEndTurn,
   onConfirmHeard,
   onContinue,
+  onTranscriptUpdate,
 }) {
   const partner = players.find((p) => p.id !== myPlayer.id)
   const plot = getPlot(room.plot_id)
@@ -32,6 +36,25 @@ export default function GameBoard({
   const speakerNumber = speakerNumberForTurn(room.current_turn, room.first_speaker)
   const amISpeaker = myPlayer.player_number === speakerNumber
   const phase = room.turn_phase
+
+  // Only the speaker's browser listens to its own microphone. The listener
+  // sees the same text a moment later, synced through the room row.
+  const [myLiveText, setMyLiveText] = useState('')
+  const listening = amISpeaker && phase === 'active'
+  const { supported: speechSupported, error: speechError } = useSpeechRecognition(
+    listening,
+    (text) => {
+      setMyLiveText(text)
+      onTranscriptUpdate?.(text)
+    }
+  )
+  const liveTranscriptText = amISpeaker ? myLiveText : room.turn_transcripts?.[String(stageNumber)] || ''
+
+  // Starting a new stage should show a blank transcript, not the previous
+  // speaker's leftover text, until fresh speech comes in.
+  useEffect(() => {
+    setMyLiveText('')
+  }, [stageNumber])
 
   const availableCards = cards.filter((c) => c.status === 'available')
   const mySelectionType = amISpeaker ? 'speaker_claim' : 'listener_heard'
@@ -110,6 +133,15 @@ export default function GameBoard({
               </>
             )}
           </div>
+
+          {speechSupported && (
+            <TranscriptPanel text={liveTranscriptText} listening={listening} speechError={speechError} />
+          )}
+          {!speechSupported && amISpeaker && phase === 'active' && (
+            <p className="muted transcript-unsupported">
+              Live transcription needs Chrome — the rest of the game still works fine here.
+            </p>
+          )}
 
           <div className="card-grid">
             {cards.map((card) => {

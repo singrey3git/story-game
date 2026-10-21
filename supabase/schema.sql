@@ -25,6 +25,7 @@ create table if not exists rooms (
                        check (turn_phase in ('active', 'awaiting_confirm', 'reviewing', 'finished')),
   turn_started_at   timestamptz,
   stage_durations   jsonb not null default '{}'::jsonb,
+  turn_transcripts  jsonb not null default '{}'::jsonb,
   last_turn_result  jsonb,
   created_at        timestamptz not null default now()
 );

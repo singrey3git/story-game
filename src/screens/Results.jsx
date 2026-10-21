@@ -1,6 +1,6 @@
 import { formatElapsed } from '../components/StageTimer'
 import StageThread from '../components/StageThread'
-import { getPlot, getStages } from '../lib/gameLogic'
+import { getPlot, getStages, speakerNumberForTurn } from '../lib/gameLogic'
 
 function playerVocabStats(player, cards, selections) {
   const unfamiliarIds = new Set(
@@ -56,12 +56,17 @@ export default function Results({
   players,
   selections,
   stageDurations,
+  turnTranscripts,
+  firstSpeaker,
   onPlayAgain,
   onPracticeAgain,
   busy,
 }) {
   const plot = getPlot(plotId)
   const stages = getStages(plotId)
+  const transcripts = turnTranscripts || {}
+  const hasTranscript = Object.values(transcripts).some((t) => (t || '').trim().length > 0)
+  const playerByNumber = (number) => (players || []).find((p) => p.player_number === number)
   const validated = cards.filter((c) => c.status === 'validated')
   const remaining = cards.filter((c) => c.status === 'available')
   const total = cards.length
@@ -106,7 +111,10 @@ export default function Results({
             {stages.map((stage) => {
               const stageCards = validated.filter((c) => c.validated_stage === stage.number)
               const seconds = durations[stage.number]
-              if (stageCards.length === 0 && seconds === undefined) return null
+              const transcriptText = (transcripts[stage.number] || transcripts[String(stage.number)] || '').trim()
+              if (stageCards.length === 0 && seconds === undefined && !transcriptText) return null
+              const speakerNumber = firstSpeaker ? speakerNumberForTurn(stage.number, firstSpeaker) : null
+              const speaker = speakerNumber ? playerByNumber(speakerNumber) : null
               return (
                 <div key={stage.number} className="results-stage">
                   <div className="results-stage__head">
@@ -124,10 +132,42 @@ export default function Results({
                   ) : (
                     <p className="muted">No cards confirmed on this stage.</p>
                   )}
+                  {transcriptText && (
+                    <blockquote className="results-stage__transcript">
+                      {speaker && <span className="results-stage__speaker">{speaker.display_name}: </span>}
+                      {transcriptText}
+                    </blockquote>
+                  )}
                 </div>
               )
             })}
           </div>
+
+          {hasTranscript && (
+            <div className="panel">
+              <p className="eyebrow">Full story transcript</p>
+              <div className="full-transcript">
+                {stages.map((stage) => {
+                  const transcriptText = (
+                    transcripts[stage.number] ||
+                    transcripts[String(stage.number)] ||
+                    ''
+                  ).trim()
+                  if (!transcriptText) return null
+                  const speakerNumber = firstSpeaker ? speakerNumberForTurn(stage.number, firstSpeaker) : null
+                  const speaker = speakerNumber ? playerByNumber(speakerNumber) : null
+                  return (
+                    <p key={stage.number} className="full-transcript__line">
+                      <span className="full-transcript__speaker">
+                        {speaker?.display_name || `Player ${speakerNumber}`}:
+                      </span>{' '}
+                      {transcriptText}
+                    </p>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {remaining.length > 0 && (
             <div className="panel">

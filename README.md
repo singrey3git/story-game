@@ -52,6 +52,33 @@ alter table rooms add column if not exists stage_durations jsonb not null defaul
 
 (Also saved as [`supabase/migration_add_stage_timing.sql`](./supabase/migration_add_stage_timing.sql).)
 
+And if you're pulling in the live speech-transcription feature, run this one too:
+
+```sql
+alter table rooms add column if not exists turn_transcripts jsonb not null default '{}'::jsonb;
+```
+
+(Also saved as [`supabase/migration_add_turn_transcripts.sql`](./supabase/migration_add_turn_transcripts.sql).)
+
+## Live speech transcription
+
+While it's your turn to speak, Chrome listens through your microphone and shows a live,
+text transcript of what you're saying — your partner sees the same text appear on their screen a
+moment later. At the end of the game, the full story transcript (everyone's turns, in order) is
+shown on the results screen.
+
+This uses the browser's built-in Web Speech API, so:
+
+- **It only reliably works in Google Chrome** (desktop or Android). Safari and Firefox don't
+  support it — in those browsers the rest of the game works exactly as before, just without the
+  transcript, and a small note says so.
+- The browser will ask for microphone permission the first time a speaker's turn starts — allow
+  it so transcription can run.
+- It needs the page to be served over **https** (GitHub Pages is) or on `localhost` during local
+  development — it won't work if you open `index.html` directly as a `file://` URL.
+- Nothing audio is recorded or uploaded anywhere — Chrome turns speech into text locally/via
+  Google's recognition service, and only the resulting text is saved to Supabase.
+
 ## 1. Set up Supabase
 
 1. Create a free project at [supabase.com](https://supabase.com).

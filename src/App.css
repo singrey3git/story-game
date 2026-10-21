@@ -1132,3 +1132,74 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------------- transcript */
+
+.panel--transcript {
+  margin-bottom: 20px;
+  border-color: rgba(244, 238, 223, 0.14);
+}
+
+.transcript__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.transcript__dot {
+  color: #e0665a;
+  font-size: 11px;
+  animation: transcript-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes transcript-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+.transcript__text {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-text);
+  margin: 0;
+  min-height: 24px;
+}
+
+.transcript-unsupported {
+  margin-bottom: 20px;
+}
+
+.results-stage__transcript {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid rgba(244, 238, 223, 0.18);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-text-60);
+  font-style: italic;
+}
+
+.results-stage__speaker {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--ink-text);
+}
+
+.full-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.full-transcript__line {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-text);
+}
+
+.full-transcript__speaker {
+  font-weight: 600;
+  margin-right: 4px;
+}
