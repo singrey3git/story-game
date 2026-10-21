@@ -1203,3 +1203,13 @@ textarea {
   font-weight: 600;
   margin-right: 4px;
 }
+
+/* ---------------------------------------------------------------------- highlighted cards in transcript */
+
+.transcript-highlight {
+  background: rgba(224, 181, 90, 0.28);
+  color: var(--ink-text);
+  border-radius: 4px;
+  padding: 0 2px;
+  font-weight: 600;
+}

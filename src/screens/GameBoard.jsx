@@ -38,7 +38,7 @@ export default function GameBoard({
   const phase = room.turn_phase
 
   // Only the speaker's browser listens to its own microphone. The listener
-  // sees the same text a moment later, synced through the room row.
+  // does not see it live — the text is only saved for the final results.
   const [myLiveText, setMyLiveText] = useState('')
   const listening = amISpeaker && phase === 'active'
   const { supported: speechSupported, error: speechError } = useSpeechRecognition(
@@ -48,7 +48,6 @@ export default function GameBoard({
       onTranscriptUpdate?.(text)
     }
   )
-  const liveTranscriptText = amISpeaker ? myLiveText : room.turn_transcripts?.[String(stageNumber)] || ''
 
   // Starting a new stage should show a blank transcript, not the previous
   // speaker's leftover text, until fresh speech comes in.
@@ -121,7 +120,7 @@ export default function GameBoard({
                 <p className="eyebrow">Your turn</p>
                 <h2>{stageInfo.name}</h2>
                 <p className="muted">Continue what your partner created. Do not restart the story.</p>
-                <p className="muted">Try to use at least 2 expressions while you speak.</p>
+                <p className="muted">Try to use several expressions while you speak.</p>
               </>
             ) : (
               <>
@@ -134,8 +133,8 @@ export default function GameBoard({
             )}
           </div>
 
-          {speechSupported && (
-            <TranscriptPanel text={liveTranscriptText} listening={listening} speechError={speechError} />
+          {speechSupported && amISpeaker && phase === 'active' && (
+            <TranscriptPanel text={myLiveText} listening={listening} speechError={speechError} />
           )}
           {!speechSupported && amISpeaker && phase === 'active' && (
             <p className="muted transcript-unsupported">

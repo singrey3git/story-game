@@ -1,3 +1,4 @@
+import HighlightedTranscript from '../components/HighlightedTranscript'
 import { formatElapsed } from '../components/StageTimer'
 import StageThread from '../components/StageThread'
 import { getPlot, getStages, speakerNumberForTurn } from '../lib/gameLogic'
@@ -135,7 +136,7 @@ export default function Results({
                   {transcriptText && (
                     <blockquote className="results-stage__transcript">
                       {speaker && <span className="results-stage__speaker">{speaker.display_name}: </span>}
-                      {transcriptText}
+                      <HighlightedTranscript text={transcriptText} cards={stageCards} />
                     </blockquote>
                   )}
                 </div>
@@ -156,12 +157,13 @@ export default function Results({
                   if (!transcriptText) return null
                   const speakerNumber = firstSpeaker ? speakerNumberForTurn(stage.number, firstSpeaker) : null
                   const speaker = speakerNumber ? playerByNumber(speakerNumber) : null
+                  const stageCards = validated.filter((c) => c.validated_stage === stage.number)
                   return (
                     <p key={stage.number} className="full-transcript__line">
                       <span className="full-transcript__speaker">
                         {speaker?.display_name || `Player ${speakerNumber}`}:
                       </span>{' '}
-                      {transcriptText}
+                      <HighlightedTranscript text={transcriptText} cards={stageCards} />
                     </p>
                   )
                 })}
